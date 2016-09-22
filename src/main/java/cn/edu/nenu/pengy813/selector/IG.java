@@ -62,17 +62,16 @@ public class IG implements WeightingMethod{
                         double tmp1 = labels.stream()
                                 .mapToDouble(label -> {
                                     double pct =dsdf.getWordDF(label, word) / dsdf.getWordDF(word, false);
-                                    // TODO: 16-9-21 当该类下未出现某个词时，pct = 0, log(pct) 趋近于无穷小
-//                                    System.out.println(label+" " + word+ " "+ Math.log(pct) +" " + ds.getWordDF(label, word) + " " + ds.getWordDF(word, false));
-                                    return pct * Math.log(pct);})
+                                    if(pct == 0) return 0.0d;
+                                    else return pct * Math.log(pct);})
                                 .sum() * pt * -1.0d;
                         // sum(P(ci|t_)logP(ci|t_))
                         double tmp2 = labels.stream()
                                 .mapToDouble(label -> {
                                     double pct_ = (dsdf.getWordDF(word, false) - dsdf.getWordDF(label, word))
                                                     / (dsdf.getDocCn(false) - dsdf.getWordDF(word, false));
-                                    // TODO: 16-9-21 当该类下每篇文档都出现词word时，pct_ = 0, log(pct_) 趋近于无穷小
-                                    return pct_ * Math.log(pct_);})
+                                    if (pct_ == 0) return 0.0d;
+                                    else return pct_ * Math.log(pct_);})
                                 .sum() * pt_ * -1.0d;
                         return  tmp1 + tmp2;}))
                 .entrySet()

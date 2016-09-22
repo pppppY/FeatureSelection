@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,6 +43,8 @@ public class DataSourceDF extends DataSource {
 
     @Override
     public boolean load(String filePath) throws IOException {
+        long stime = Clock.systemDefaultZone().millis();
+        System.out.print("load datasourceDF from " + filePath + "...");
 
         Path path = Paths.get(filePath);
         if(!Files.exists(path))
@@ -82,9 +86,8 @@ public class DataSourceDF extends DataSource {
 
             }
         }
-        System.out.println("word_df " + wordDF);
-        System.out.println("label_df " + labelDF);
-        System.out.println("label_word_df " + label_word_df);
+
+        System.out.println(" using " + (Clock.systemDefaultZone().millis() - stime) * 0.5 / 1000);
         return true;
     }
 

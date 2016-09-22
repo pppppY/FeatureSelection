@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -39,6 +41,9 @@ public class DataSourceTF extends DataSource {
 
     @Override
     public boolean load(String filePath) throws IOException {
+        long stime = Clock.systemDefaultZone().millis();
+        System.out.print("load datasourceDF from " + filePath + "...");
+
         Path path = Paths.get(filePath);
         if(!Files.exists(path))
 
@@ -91,10 +96,7 @@ public class DataSourceTF extends DataSource {
                 labelTF.put(label, wordCount * 1.0d);
             else labelTF.put(label, ltf + wordCount);
         }
-
-        System.out.println("word_tf " + wordTF);
-        System.out.println("label_tf " + labelTF);
-        System.out.println("label_word_tf " + label_word_tf);
+        System.out.println(" using " + (Clock.systemDefaultZone().millis() - stime) * 0.5 / 1000);
         return true;
     }
     // 得到词典

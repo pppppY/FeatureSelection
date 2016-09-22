@@ -10,6 +10,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.Period;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,6 +30,14 @@ public class DataSourcePF extends DataSource {
     // 每个类别中词的npf
     private Table<String, String, Double> label_word_npf;
 
+    private Map<String, Double> word_npf;
+
+    private Map<String, Double> label_npf;
+
+    private Map<String, Double> word_npf_df;
+
+    private Map<String, Double> label_npf_df;
+
     private DataSourcePF() throws IOException {
     }
 
@@ -40,12 +52,17 @@ public class DataSourcePF extends DataSource {
         }
         label_docs = HashMultimap.create();
         label_word_npf = HashBasedTable.create();
-        return load(dataFilePath);
+        return false;
 
     }
 
     @Override
     public boolean load(String filePath) throws IOException {
+        long stime = Clock.systemDefaultZone().millis();
+
+        System.out.print("load datasourcePF from " + filePath + "...");
+
+
         // 每篇文档中词的pf（通过词出现的段数计算得到）
         Table<Integer, String, Double> doc_word_pf = HashBasedTable.create();
 
@@ -103,9 +120,7 @@ public class DataSourcePF extends DataSource {
                 doc_word_npf.put(d_w_e.getKey(), w_e.getKey(), w_e.getValue() * 1.0 / pfsum);
             }
         }
-        System.out.println("label_docs " + label_docs);
-        System.out.println("doc_word_pf " + doc_word_pf);
-        System.out.println("doc_word_npf " + doc_word_npf);
+
         // 计算每个类别中词的npf
         label_docs.asMap()
                 .forEach((label, docIdxSet) -> {
@@ -118,10 +133,52 @@ public class DataSourcePF extends DataSource {
                                 label_word_npf.put(label, word, ans);
                             });
         });
+        // 计算整篇语料库下，词的npf（计算npf不使用df）
+        word_npf = getDictionary().stream().collect(
+                                Collectors.toMap(
+                                    word -> word,
+                                    word -> label_word_npf
+                                            .column(word)
+                                            .values()
+                                            .stream()
+                                            .reduce((sum, item) -> sum + item)
+                                            .get()));
+        // 计算某个类别下，所有词的npf之和（计算npf不使用df）
+        label_npf = getLabels().stream().collect(
+                                Collectors.toMap(
+                                        label -> label,
+                                        label -> label_word_npf
+                                                .row(label)
+                                                .values()
+                                                .stream()
+                                                .reduce((sum, item) -> sum + item)
+                                                .get()));
+        // 计算整篇语料库下，词的npf（计算npf使用df）
+        word_npf_df = getDictionary().stream().collect(
+                Collectors.toMap(
+                        word -> word,
+                        word -> label_word_npf
+                                .column(word).entrySet()
+                                .stream()
+                                .mapToDouble(npf -> {
+                                    String label = npf.getKey();
+                                    return npf.getValue() *
+                                            (dsdf.getWordDF(label, word) / dsdf.getLabelDF(label));})
+                                .sum()));
+        // 计算某个类别下，所有词的npf之和（计算npf使用df）
+        label_npf_df = getLabels().stream().collect(
+                Collectors.toMap(
+                        label -> label,
+                        label -> label_word_npf
+                                .row(label).entrySet()
+                                .stream()
+                                .mapToDouble(npf -> {
+                                    String word = npf.getKey();
+                                    return npf.getValue() *
+                                            (dsdf.getWordDF(label, word) / dsdf.getLabelDF(label));})
+                                .sum()));
 
-
-
-        System.out.println("label_word_npf " + label_word_npf);
+        System.out.println(" using " + (Clock.systemDefaultZone().millis() - stime) * 0.5 / 1000);
         return true;
     }
 
@@ -168,18 +225,9 @@ public class DataSourcePF extends DataSource {
             return 0.0d;
         else{
             if(withDF){
-                return label_word_npf.column(word).entrySet()
-                        .stream()
-                        .mapToDouble(npf -> {
-                            String label = npf.getKey();
-                            return npf.getValue() *
-                                    (dsdf.getWordDF(label, word) / dsdf.getLabelDF(label));})
-                        .sum();
+                return word_npf_df.get(word);
             }else {
-                return label_word_npf.column(word).values()
-                        .stream()
-                        .reduce((sum, item) -> sum + item)
-                        .get();
+                return word_npf.get(word);
             }
         }
     }
@@ -190,18 +238,9 @@ public class DataSourcePF extends DataSource {
             return 0.0d;
         else{
             if(withDF){
-                return label_word_npf.row(label).entrySet()
-                        .stream()
-                        .mapToDouble(npf -> {
-                            String word = npf.getKey();
-                            return npf.getValue() *
-                                    (dsdf.getWordDF(label, word) / dsdf.getLabelDF(label));})
-                        .sum();
+                return label_npf_df.get(label);
             }else {
-                return label_word_npf.row(label).values()
-                        .stream()
-                        .reduce((sum, item) -> sum + item)
-                        .get();
+                return label_npf.get(label);
             }
         }
     }
